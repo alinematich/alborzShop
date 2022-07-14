@@ -1,0 +1,328 @@
+{% load i18n static %}<!DOCTYPE html>
+{% get_current_language as LANGUAGE_CODE %}{% get_current_language_bidi as LANGUAGE_BIDI %}
+<html lang="{{ LANGUAGE_CODE|default:"en-us" }}" {% if LANGUAGE_BIDI %}dir="rtl"{% endif %}>
+<head>
+<title>{% block title %}{% endblock %}</title>
+<link rel="stylesheet" type="text/css" href="{% block stylesheet %}{% static "admin/css/base.css" %}{% endblock %}">
+{% block extrastyle %}{% endblock %}
+{% if LANGUAGE_BIDI %}<link rel="stylesheet" type="text/css" href="{% block stylesheet_rtl %}{% static "admin/css/rtl.css" %}{% endblock %}">{% endif %}
+{% block extra_head %}
+    <link rel='stylesheet' href='{% static 'admin/css/rtl.css' %}' />
+
+{% endblock %}
+{% block responsive %}
+    <meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="{% static "admin/css/responsive.css" %}">
+    {% if LANGUAGE_BIDI %}<link rel="stylesheet" type="text/css" href="{% static "admin/css/responsive_rtl.css" %}">{% endif %}
+{% endblock %}
+{% block blockbots %}<meta name="robots" content="NONE,NOARCHIVE">{% endblock %}
+</head>
+{% load i18n %}
+
+<body class="{% if is_popup %}popup {% endif %}{% block bodyclass %}{% endblock %}"
+  data-admin-utc-offset="{% now "Z" %}">
+
+<!-- Container -->
+<div id="container">
+
+    {% if not is_popup %}
+    <!-- Header -->
+    <div id="header">
+        <div id="branding">
+        {% block branding %}{% endblock %}
+        </div>
+        {% block usertools %}
+        {% if has_permission %}
+        <div id="user-tools">
+            {% block welcome-msg %}
+                {% trans 'Welcome,' %}
+                <strong>{% firstof user.get_short_name user.get_username %}</strong>.
+            {% endblock %}
+            {% block userlinks %}
+                {% if site_url %}
+                    <a href="{{ site_url }}">{% trans 'View site' %}</a> /
+                {% endif %}
+                {% if user.is_active and user.is_staff %}
+                    {% url 'django-admindocs-docroot' as docsroot %}
+                    {% if docsroot %}
+                        <a href="{{ docsroot }}">{% trans 'Documentation' %}</a> /
+                    {% endif %}
+                {% endif %}
+                {% if user.has_usable_password %}
+                <a href="{% url 'admin:password_change' %}">{% trans 'Change password' %}</a> /
+                {% endif %}
+                <a href="{% url 'admin:logout' %}">{% trans 'Log out' %}</a>
+            {% endblock %}
+        </div>
+        {% endif %}
+        {% endblock %}
+        {% block nav-global %}{% endblock %}
+    </div>
+    <!-- END Header -->
+
+    {% block breadcrumbs %}
+    <div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    {% if title %} &rsaquo; {{ title }}{% endif %}
+    </div>
+    {% endblock %}
+    {% endif %}
+    <div style="width:100%; height:170px; padding-top: 20px">
+        <div style="position: absolute; left: 40px;">
+            <canvas id="canvas" width="150" height="150"></canvas>
+            <div id="shamsidate"></div>
+        </div>
+    </div>
+    {% block messages %}
+        {% if messages %}
+        <ul class="messagelist">{% for message in messages %}
+          <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message|capfirst }}</li>
+        {% endfor %}</ul>
+        {% endif %}
+    {% endblock messages %}
+
+    <!-- Content -->
+    <div id="content" class="{% block coltype %}colM{% endblock %}">
+        {% block pretitle %}{% endblock %}
+        {% block content_title %}{% if title %}<h1>{{ title }}</h1>{% endif %}{% endblock %}
+        {% block content %}
+        {% block object-tools %}{% endblock %}
+        {{ content }}
+        {% endblock %}
+        {% block sidebar %}{% endblock %}
+        <br class="clear">
+    </div>
+    <!-- END Content -->
+
+    {% block footer %}<div id="footer"></div>{% endblock %}
+</div>
+<!-- END Container -->
+
+
+
+
+<script>
+    var canvas = document.getElementById("canvas");
+    var ctx = canvas.getContext("2d");
+    var radius = canvas.height / 2;
+    ctx.translate(radius, radius);
+    radius = radius * 0.90
+    setInterval(drawClock, 1000);
+    
+    function drawClock() {
+      drawFace(ctx, radius);
+      drawNumbers(ctx, radius);
+      drawTime(ctx, radius);
+    }
+    
+    function drawFace(ctx, radius) {
+      var grad;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, 2*Math.PI);
+      ctx.fillStyle = 'white';
+      ctx.fill();
+      grad = ctx.createRadialGradient(0,0,radius*0.95, 0,0,radius*1.05);
+      grad.addColorStop(0, '#333');
+      grad.addColorStop(0.5, 'white');
+      grad.addColorStop(1, '#333');
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = radius*0.1;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, radius*0.1, 0, 2*Math.PI);
+      ctx.fillStyle = '#333';
+      ctx.fill();
+    }
+    
+    function drawNumbers(ctx, radius) {
+      var ang;
+      var num;
+      ctx.font = radius*0.15 + "px arial";
+      ctx.textBaseline="middle";
+      ctx.textAlign="center";
+      for(num = 1; num < 13; num++){
+        ang = num * Math.PI / 6;
+        ctx.rotate(ang);
+        ctx.translate(0, -radius*0.85);
+        ctx.rotate(-ang);
+        ctx.fillText(num.toString(), 0, 0);
+        ctx.rotate(ang);
+        ctx.translate(0, radius*0.85);
+        ctx.rotate(-ang);
+      }
+    }
+    
+    function drawTime(ctx, radius){
+        var now = new Date();
+        var hour = now.getHours();
+        var minute = now.getMinutes();
+        var second = now.getSeconds();
+        //hour
+        hour=hour%12;
+        hour=(hour*Math.PI/6)+
+        (minute*Math.PI/(6*60))+
+        (second*Math.PI/(360*60));
+        drawHand(ctx, hour, radius*0.5, radius*0.07);
+        //minute
+        minute=(minute*Math.PI/30)+(second*Math.PI/(30*60));
+        drawHand(ctx, minute, radius*0.8, radius*0.07);
+        // second
+        second=(second*Math.PI/30);
+        drawHand(ctx, second, radius*0.9, radius*0.02);
+    }
+    
+    function drawHand(ctx, pos, length, width) {
+        ctx.beginPath();
+        ctx.lineWidth = width;
+        ctx.lineCap = "round";
+        ctx.moveTo(0,0);
+        ctx.rotate(pos);
+        ctx.lineTo(0, -length);
+        ctx.stroke();
+        ctx.rotate(-pos);
+    }
+
+
+    week = new Array("يكشنبه", "دوشنبه", "سه شنبه", "چهارشنبه", "پنج شنبه", "جمعه", "شنبه")
+    months = new Array("فروردين", "ارديبهشت", "خرداد", "تير", "مرداد", "شهريور", "مهر", "آبان", "آذر", "دي", "بهمن", "اسفند");
+    today = new Date();
+    d = today.getDay();
+    day = today.getDate();
+    month = today.getMonth() + 1;
+    year = today.getYear();
+    year = (window.navigator.userAgent.indexOf('MSIE') > 0) ? year : 1900 + year;
+    if (year == 0) {
+        year = 2000;
+    }
+    if (year < 100) {
+        year += 1900;
+    }
+    y = 1;
+    for (i = 0; i < 3000; i += 4) {
+        if (year == i) {
+            y = 2;
+        }
+    }
+    for (i = 1; i < 3000; i += 4) {
+        if (year == i) {
+            y = 3;
+        }
+    }
+    if (y == 1) {
+        year -= ((month < 3) || ((month == 3) && (day < 21))) ? 622 : 621;
+        switch (month) {
+            case 1:
+                (day < 21) ? (month = 10, day += 10) : (month = 11, day -= 20);
+                break;
+            case 2:
+                (day < 20) ? (month = 11, day += 11) : (month = 12, day -= 19);
+                break;
+            case 3:
+                (day < 21) ? (month = 12, day += 9) : (month = 1, day -= 20);
+                break;
+            case 4:
+                (day < 21) ? (month = 1, day += 11) : (month = 2, day -= 20);
+                break;
+            case 5:
+            case 6:
+                (day < 22) ? (month -= 3, day += 10) : (month -= 2, day -= 21);
+                break;
+            case 7:
+            case 8:
+            case 9:
+                (day < 23) ? (month -= 3, day += 9) : (month -= 2, day -= 22);
+                break;
+            case 10:
+                (day < 23) ? (month = 7, day += 8) : (month = 8, day -= 22);
+                break;
+            case 11:
+            case 12:
+                (day < 22) ? (month -= 3, day += 9) : (month -= 2, day -= 21);
+                break;
+            default:
+                break;
+        }
+    }
+    if (y == 2) {
+        year -= ((month < 3) || ((month == 3) && (day < 20))) ? 622 : 621;
+        switch (month) {
+            case 1:
+                (day < 21) ? (month = 10, day += 10) : (month = 11, day -= 20);
+                break;
+            case 2:
+                (day < 20) ? (month = 11, day += 11) : (month = 12, day -= 19);
+                break;
+            case 3:
+                (day < 20) ? (month = 12, day += 10) : (month = 1, day -= 19);
+                break;
+            case 4:
+                (day < 20) ? (month = 1, day += 12) : (month = 2, day -= 19);
+                break;
+            case 5:
+                (day < 21) ? (month = 2, day += 11) : (month = 3, day -= 20);
+                break;
+            case 6:
+                (day < 21) ? (month = 3, day += 11) : (month = 4, day -= 20);
+                break;
+            case 7:
+                (day < 22) ? (month = 4, day += 10) : (month = 5, day -= 21);
+                break;
+            case 8:
+                (day < 22) ? (month = 5, day += 10) : (month = 6, day -= 21);
+                break;
+            case 9:
+                (day < 22) ? (month = 6, day += 10) : (month = 7, day -= 21);
+                break;
+            case 10:
+                (day < 22) ? (month = 7, day += 9) : (month = 8, day -= 21);
+                break;
+            case 11:
+                (day < 21) ? (month = 8, day += 10) : (month = 9, day -= 20);
+                break;
+            case 12:
+                (day < 21) ? (month = 9, day += 10) : (month = 10, day -= 20);
+                break;
+            default:
+                break;
+        }
+    }
+    if (y == 3) {
+        year -= ((month < 3) || ((month == 3) && (day < 21))) ? 622 : 621;
+        switch (month) {
+            case 1:
+                (day < 20) ? (month = 10, day += 11) : (month = 11, day -= 19);
+                break;
+            case 2:
+                (day < 19) ? (month = 11, day += 12) : (month = 12, day -= 18);
+                break;
+            case 3:
+                (day < 21) ? (month = 12, day += 10) : (month = 1, day -= 20);
+                break;
+            case 4:
+                (day < 21) ? (month = 1, day += 11) : (month = 2, day -= 20);
+                break;
+            case 5:
+            case 6:
+                (day < 22) ? (month -= 3, day += 10) : (month -= 2, day -= 21);
+                break;
+            case 7:
+            case 8:
+            case 9:
+                (day < 23) ? (month -= 3, day += 9) : (month -= 2, day -= 22);
+                break;
+            case 10:
+                (day < 23) ? (month = 7, day += 8) : (month = 8, day -= 22);
+                break;
+            case 11:
+            case 12:
+                (day < 22) ? (month -= 3, day += 9) : (month -= 2, day -= 21);
+                break;
+            default:
+                break;
+        }
+    }
+    document.getElementById("shamsidate").innerText = week[d] + " " + day + " " + months[month - 1] + " " + year;
+    </script>
+
+</body>
+</html>
